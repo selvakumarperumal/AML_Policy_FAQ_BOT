@@ -207,4 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 # vectorstore
-vectorstore/
+vector_store/
+vector_store_index/
+# langchain
+langchain_index/
