@@ -1,22 +1,19 @@
 from pydantic_settings import BaseSettings
+from pydantic import SecretStr
 from pydantic import Field
 
 class Settings(BaseSettings):
-    GEMINI_API_KEY: str = Field(
+    GEMINI_API_KEY: SecretStr = Field(
         description="API key for Gemini",
     )
 
-    MISTRAL_API_KEY: str = Field(
+    MISTRAL_API_KEY: SecretStr = Field(
         description="API key for Mistral",
     )
 
     UPLOAD_DIRECTORY: str = Field(
 
         description="Directory for file uploads",
-    )
-
-    HF_TOKEN: str = Field(
-        description="Hugging Face token for model access",
     )
 
     class Config:
@@ -26,5 +23,6 @@ class Settings(BaseSettings):
             "GEMINI_API_KEY": "GEMINI_API_KEY",
             "MISTRAL_API_KEY": "MISTRAL_API_KEY",
             "UPLOAD_DIRECTORY": "UPLOAD_DIRECTORY",
-            "HF_TOKEN": "HF_TOKEN",
         }
+
+settings = Settings()
