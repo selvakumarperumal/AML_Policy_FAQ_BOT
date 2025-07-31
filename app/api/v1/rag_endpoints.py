@@ -1,4 +1,4 @@
-from fastapi import Request, APIRouter
+from fastapi import Request, APIRouter, Response
 from fastapi import UploadFile, File
 from typing import List
 from app.embeddings.vecstore import process_and_create_embeddings, load_vector_db
@@ -6,21 +6,25 @@ from fastapi import Depends
 from app.retrieval.qa_chain import answer_question
 from langchain_chroma.vectorstores import Chroma
 from typing import Dict, List
+from app.celery_backend.app.database import get_async_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.celery_backend.app.models import UserSession
+from app.celery_backend.app.crud import create_user_session
 
 router = APIRouter()
 
 @router.post("/process-input")
 async def process_input(
     request: Request,
-    files: List[UploadFile] = File(...)
-    ):
+    files: List[UploadFile] = File(...),
+):
     """Processes uploaded files and returns their combined content. And saves the vector database."""
 
     session_id = request.cookies.get("session_id") or "default_session_id"
 
     await process_and_create_embeddings(session_id, files)
 
-    return {"message": "Files processed successfully"}
+    return {"message": "Files Processed Successfully"}
 
 @router.post("/answer-question")
 async def answer_query(

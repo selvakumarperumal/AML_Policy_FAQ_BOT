@@ -65,6 +65,10 @@ async def process_and_create_embeddings(session_id: str, files: List[UploadFile]
     Returns:
         str: The file path of the saved vector database.
     """
+
+    print(f"Processing files for session: {session_id}", flush=True)
+
+
     file_contents = await store_and_process_files(files)
     await create_and_save_vector_db(session_id=session_id, documents=file_contents)
 

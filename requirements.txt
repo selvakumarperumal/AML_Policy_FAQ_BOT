@@ -9,6 +9,14 @@ langchain-google-genai
 langchain-text-splitters
 langchain-mistralai
 passlib
-shutil
 starlette
-tempfile
+python-multipart
+pypdf
+python-docx
+asyncpg
+sqlmodel
+sqlalchemy
+alembic
+celery
+redis
+asgiref

@@ -1,0 +1,61 @@
+services:
+  aml:
+    container_name: aml_policy_faq_bot  # Name of the container for the AML Policy FAQ Bot service
+    build:
+      context: .  # Specifies the build context, which is the current directory
+    env_file:
+      - .env  # Specifies the environment variables file for the AML service
+    volumes:
+      - ./app:/aml_policy_faq_bot/app  # Mounts the local `app` directory to the container's `/aml_policy_faq_bot/app` directory
+    command: /start.sh  # Command to execute when the container starts
+    ports:
+      - "5000:8000"  # Maps port 8000 in the container to port 5000 on the host machine
+    restart: unless-stopped  # Automatically restarts the container unless it is explicitly stopped
+    depends_on:
+      db:
+        condition: service_healthy  # Ensures the `db` service is healthy before starting this service
+      redis:
+        condition: service_healthy  # Ensures the `redis` service is healthy before starting
+
+  aml-worker:
+    container_name: aml_policy_faq_bot_worker  # Name of the container for the AML worker service
+    build:
+      context: .  # Specifies the build context, which is the current directory
+    env_file:
+      - .env  # Specifies the environment variables file for the AML worker service
+    volumes:
+      - ./app:/aml_policy_faq_bot/app  # Mounts the local `app` directory to the container's `/aml_policy_faq_bot/app` directory
+    command: /start_worker.sh  # Command to execute when the worker container starts
+    depends_on:
+      db:
+        condition: service_healthy  # Ensures the `db` service is healthy before starting this service
+      redis:
+        condition: service_healthy  # Ensures the `redis` service is healthy before starting
+
+  db:
+    image: postgres:17  # Specifies the PostgreSQL image with version 17
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]  # Command to check if the PostgreSQL service is ready
+      interval: 5s  # Time interval between health check attempts
+      timeout: 30s  # Maximum time to wait for a health check to complete
+      retries: 5  # Number of retries before considering the service unhealthy
+      start_period: 30s  # Initial delay before starting health checks
+    container_name: aml_policy_faq_bot_db  # Name of the container for the PostgreSQL database
+    env_file:
+      - .db.env  # Specifies the environment variables file for the database service
+    ports:
+      - "5432:5432"  # Maps port 5432 in the container to port 5432 on the host machine
+    restart: unless-stopped  # Automatically restarts the container unless it is explicitly stopped
+
+  redis:
+    image: redis:latest  # Specifies the Redis image with the latest version
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]  # Command to check if the Redis service is ready
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    container_name: aml_policy_faq_bot_redis  # Name of the container for the Redis service
+    ports:
+      - "6379:6379"  # Maps port 6379 in the container to port 6379 on the host machine
+    restart: unless-stopped  # Automatically restarts the container unless it is explicitly stopped
