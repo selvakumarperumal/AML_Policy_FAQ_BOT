@@ -1,0 +1,97 @@
+name: Deploy Frontend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+
+env:
+  AWS_REGION: ap-south-1
+  NODE_VERSION: '20'
+  TF_VERSION: 1.9.0
+
+jobs:
+  build:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Get Backend API URL
+        id: backend
+        working-directory: infrastructure/backend
+        run: |
+          terraform init -backend-config=backend.hcl
+          echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+
+      - name: Get Frontend Infrastructure Outputs
+        id: frontend
+        working-directory: infrastructure/frontend
+        run: |
+          terraform init -backend-config=backend.hcl
+          echo "bucket=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_OUTPUT
+          echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "cloudfront_url=$(terraform output -raw cloudfront_domain_name)" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ steps.backend.outputs.api_url }}
+        run: npm run build
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/dist s3://${{ steps.frontend.outputs.bucket }} \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "*.html"
+          
+          # Upload HTML files with no-cache
+          aws s3 cp frontend/dist/index.html s3://${{ steps.frontend.outputs.bucket }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.frontend.outputs.distribution_id }} \
+            --paths "/*"
+
+      - name: Deployment Summary
+        run: |
+          echo "## ✅ Frontend Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend URL" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.frontend.outputs.cloudfront_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 Bucket: ${{ steps.frontend.outputs.bucket }}" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ steps.frontend.outputs.distribution_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend API: ${{ steps.backend.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY

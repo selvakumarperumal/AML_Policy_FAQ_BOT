@@ -1,4 +1,4 @@
-name: Infrastructure
+name: Infrastructure (Frontend)
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
     
     defaults:
       run:
-        working-directory: infrastructure/backend
+        working-directory: infrastructure/frontend
     
     steps:
       - uses: actions/checkout@v4
@@ -47,27 +47,14 @@ jobs:
       # ========================
       - name: Terraform Plan
         if: inputs.action == 'plan'
-        run: |
-          terraform plan \
-            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
-            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
-            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
-            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
-            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
+        run: terraform plan
 
       # ========================
       # APPLY
       # ========================
       - name: Terraform Plan (for Apply)
         if: inputs.action == 'apply'
-        run: |
-          terraform plan \
-            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
-            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
-            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
-            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
-            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}" \
-            -out=tfplan
+        run: terraform plan -out=tfplan
 
       - name: Terraform Apply
         if: inputs.action == 'apply'
@@ -77,33 +64,28 @@ jobs:
         if: inputs.action == 'apply'
         id: outputs
         run: |
-          echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
-          echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+          echo "bucket=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_OUTPUT
+          echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "frontend_url=$(terraform output -raw cloudfront_domain_name)" >> $GITHUB_OUTPUT
       
       - name: Apply Summary
         if: inputs.action == 'apply'
         run: |
-          echo "## ✅ Backend Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Frontend Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### API Gateway URL" >> $GITHUB_STEP_SUMMARY
-          echo "**${{ steps.outputs.outputs.api_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend URL" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.outputs.outputs.frontend_url }}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Resources" >> $GITHUB_STEP_SUMMARY
-          echo "- S3 Bucket: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 Bucket: ${{ steps.outputs.outputs.bucket }}" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ steps.outputs.outputs.distribution_id }}" >> $GITHUB_STEP_SUMMARY
 
       # ========================
       # DESTROY
       # ========================
       - name: Terraform Destroy Plan
         if: inputs.action == 'destroy'
-        run: |
-          terraform plan -destroy \
-            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
-            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
-            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
-            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
-            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}" \
-            -out=tfplan-destroy
+        run: terraform plan -destroy -out=tfplan-destroy
 
       - name: Terraform Destroy
         if: inputs.action == 'destroy'
@@ -112,5 +94,5 @@ jobs:
       - name: Destroy Summary
         if: inputs.action == 'destroy'
         run: |
-          echo "## 🗑️ Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
-          echo "All resources have been removed." >> $GITHUB_STEP_SUMMARY
+          echo "## 🗑️ Frontend Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "All frontend resources have been removed." >> $GITHUB_STEP_SUMMARY

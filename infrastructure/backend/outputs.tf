@@ -1,5 +1,6 @@
 # Outputs
 
+# Backend
 output "lambda_function_name" {
   description = "Lambda function name"
   value       = aws_lambda_function.api.function_name
@@ -11,7 +12,7 @@ output "lambda_function_url" {
 }
 
 output "api_gateway_url" {
-  description = "API Gateway endpoint URL"
+  description = "API Gateway endpoint URL (use for frontend)"
   value       = aws_apigatewayv2_api.http.api_endpoint
 }
 
