@@ -2,6 +2,16 @@ name: Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
 
 env:
   AWS_REGION: ap-south-1
@@ -9,7 +19,7 @@ env:
 
 jobs:
   terraform:
-    name: Terraform
+    name: Terraform ${{ inputs.action }}
     runs-on: ubuntu-latest
     
     defaults:
@@ -31,28 +41,68 @@ jobs:
       
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
-      
+
+      # ========================
+      # PLAN
+      # ========================
       - name: Terraform Plan
+        if: inputs.action == 'plan'
+        run: |
+          terraform plan \
+            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
+            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
+            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}"
+
+      # ========================
+      # APPLY
+      # ========================
+      - name: Terraform Plan (for Apply)
+        if: inputs.action == 'apply'
         run: |
           terraform plan \
             -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
             -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
             -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
             -out=tfplan
-      
+
       - name: Terraform Apply
+        if: inputs.action == 'apply'
         run: terraform apply -auto-approve tfplan
       
       - name: Get Outputs
+        if: inputs.action == 'apply'
         id: outputs
         run: |
           echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
           echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
           echo "lambda_url=$(terraform output -raw lambda_function_url)" >> $GITHUB_OUTPUT
       
-      - name: Summary
+      - name: Apply Summary
+        if: inputs.action == 'apply'
         run: |
-          echo "## Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- API: ${{ steps.outputs.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Lambda: ${{ steps.outputs.outputs.lambda_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- S3: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Gateway**: ${{ steps.outputs.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lambda URL**: ${{ steps.outputs.outputs.lambda_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Bucket**: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY
+
+      # ========================
+      # DESTROY
+      # ========================
+      - name: Terraform Destroy Plan
+        if: inputs.action == 'destroy'
+        run: |
+          terraform plan -destroy \
+            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
+            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
+            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
+            -out=tfplan-destroy
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        run: terraform apply -auto-approve tfplan-destroy
+
+      - name: Destroy Summary
+        if: inputs.action == 'destroy'
+        run: |
+          echo "## 🗑️ Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "All resources have been removed." >> $GITHUB_STEP_SUMMARY
