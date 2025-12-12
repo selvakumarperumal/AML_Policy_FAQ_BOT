@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     
     # LLM Settings (with defaults)
     LLM_TEMPERATURE: float = 0.1
-    LLM_MAX_TOKENS: int = 2048
+    LLM_MAX_TOKENS: int = 512  # Reduced to enforce concise answers
     
     # Text Splitting
     CHUNK_SIZE: int = 1000
