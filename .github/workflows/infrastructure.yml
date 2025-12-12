@@ -1,0 +1,58 @@
+name: Infrastructure
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  TF_VERSION: 1.9.0
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: infrastructure/backend
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Terraform Init
+        run: terraform init -backend-config=backend.hcl
+      
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
+            -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
+            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
+            -out=tfplan
+      
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+      
+      - name: Get Outputs
+        id: outputs
+        run: |
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+          echo "lambda_url=$(terraform output -raw lambda_function_url)" >> $GITHUB_OUTPUT
+      
+      - name: Summary
+        run: |
+          echo "## Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- API: ${{ steps.outputs.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Lambda: ${{ steps.outputs.outputs.lambda_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,12 @@
+"""NVIDIA AI Embeddings for the AML Policy FAQ Bot."""
+
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from app.core.config import settings
+
+
+def get_embeddings() -> NVIDIAEmbeddings:
+    """Get the configured NVIDIA embeddings instance."""
+    return NVIDIAEmbeddings(
+        model=settings.NVIDIA_EMBEDDING_MODEL_NAME,
+        api_key=settings.NVIDIA_API_KEY.get_secret_value(),
+    )
