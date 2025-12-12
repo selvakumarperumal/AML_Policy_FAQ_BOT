@@ -25,7 +25,6 @@ from app.schemas import (
 from app.agents.rag_agent import RAGAgent
 from app.embeddings.vecstore import get_vector_store, add_documents_to_store
 from app.utils.file_parser import parse_multiple_files, get_supported_extensions
-from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)

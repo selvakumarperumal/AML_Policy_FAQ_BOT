@@ -7,7 +7,7 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
-from app.core.config import settings
+from app.core.config import init_settings
 from app.schemas import SourceDocument, StreamChunk
 
 
@@ -21,6 +21,9 @@ class RAGState(MessagesState):
 
 def get_llm() -> ChatNVIDIA:
     """Get NVIDIA LLM instance."""
+    settings = init_settings()
+    if not settings.NVIDIA_API_KEY:
+        raise ValueError("NVIDIA_API_KEY is required")
     return ChatNVIDIA(
         model=settings.NVIDIA_MODEL_NAME,
         api_key=settings.NVIDIA_API_KEY.get_secret_value(),

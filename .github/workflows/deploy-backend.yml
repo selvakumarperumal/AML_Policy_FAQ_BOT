@@ -31,6 +31,10 @@ jobs:
         run: uv sync
 
       - name: Verify imports
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_MODEL_NAME: ${{ secrets.NVIDIA_MODEL_NAME }}
+          NVIDIA_EMBEDDING_MODEL_NAME: ${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}
         run: |
           uv run python -c "from app.main import app; print('FastAPI app OK')"
           uv run python -c "from handler import handler; print('Lambda handler OK')"

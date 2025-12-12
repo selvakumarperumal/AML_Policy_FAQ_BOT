@@ -12,12 +12,13 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from app.core.config import settings
+from app.core.config import init_settings
 from app.embeddings.embedder import get_embeddings
 
 
 def get_text_splitter() -> RecursiveCharacterTextSplitter:
     """Get the configured text splitter."""
+    settings = init_settings()
     return RecursiveCharacterTextSplitter(
         chunk_size=settings.CHUNK_SIZE,
         chunk_overlap=settings.CHUNK_OVERLAP,
@@ -27,11 +28,13 @@ def get_text_splitter() -> RecursiveCharacterTextSplitter:
 
 def _get_chroma_path() -> str:
     """Get Chroma storage path."""
+    settings = init_settings()
     return settings.VECTOR_STORE_PATH
 
 
 def _sync_from_s3():
     """Download Chroma DB from S3."""
+    settings = init_settings()
     if not settings.S3_BUCKET:
         return
     
@@ -58,6 +61,7 @@ def _sync_from_s3():
 
 def _sync_to_s3():
     """Upload Chroma DB to S3."""
+    settings = init_settings()
     if not settings.S3_BUCKET:
         return
     

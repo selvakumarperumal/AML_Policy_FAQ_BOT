@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     # AWS (optional for local dev, set by Secrets Manager on Lambda)
     S3_BUCKET: Optional[str] = None
     
-    # NVIDIA (required)
-    NVIDIA_API_KEY: SecretStr
-    NVIDIA_MODEL_NAME: str
-    NVIDIA_EMBEDDING_MODEL_NAME: str
+    # NVIDIA (required in production, optional for testing)
+    NVIDIA_API_KEY: Optional[SecretStr] = None
+    NVIDIA_MODEL_NAME: str = "meta/llama-3.1-70b-instruct"
+    NVIDIA_EMBEDDING_MODEL_NAME: str = "nvidia/nv-embedqa-e5-v5"
     
     # LLM Settings (with defaults)
     LLM_TEMPERATURE: float = 0.1
@@ -30,4 +30,13 @@ def get_settings() -> Settings:
     return Settings()
 
 
-settings = get_settings()
+# Lazy-loaded settings - only accessed when needed, not at import time
+settings: Settings = None  # type: ignore
+
+
+def init_settings() -> Settings:
+    """Initialize settings. Call this when you need settings."""
+    global settings
+    if settings is None:
+        settings = get_settings()
+    return settings

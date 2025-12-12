@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints import router as api_router
-from app.core.config import settings
+from app.core.config import init_settings
 
 
 # Configure logging
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting AML Policy FAQ Bot...")
+    settings = init_settings()
     logger.info(f"Vector store path: {settings.VECTOR_STORE_PATH}")
     
     yield
