@@ -114,9 +114,10 @@ class RAGAgent:
             yield StreamChunk(type="done", content="")
             return
         
-        # Stream LLM tokens only
-        async for chunk, _ in self.graph.astream(initial_state, stream_mode="messages"):
-            if hasattr(chunk, 'content') and chunk.content:
+        # Stream only AI message tokens (filter out human messages, tool calls, etc.)
+        async for chunk, metadata in self.graph.astream(initial_state, stream_mode="messages"):
+            # Only yield actual AI content, not human messages or empty chunks
+            if isinstance(chunk, AIMessage) and hasattr(chunk, 'content') and chunk.content:
                 yield StreamChunk(type="token", content=chunk.content)
         
         yield StreamChunk(type="done", content="")
