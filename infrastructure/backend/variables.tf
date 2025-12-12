@@ -20,11 +20,11 @@ variable "lambda_timeout" {
   default = 30
 }
 
-# Secrets (from GitHub Actions or terraform.tfvars)
+# NVIDIA Secrets (from GitHub Actions)
 variable "nvidia_api_key" {
   type      = string
   sensitive = true
-  default   = "" # Placeholder - real value via TF_VAR_nvidia_api_key or terraform.tfvars
+  default   = ""
 }
 
 variable "nvidia_model_name" {
@@ -35,4 +35,17 @@ variable "nvidia_model_name" {
 variable "nvidia_embedding_model_name" {
   type    = string
   default = "nvidia/nv-embedqa-e5-v5"
+}
+
+# Qdrant Cloud Secrets (from GitHub Actions)
+variable "qdrant_url" {
+  type      = string
+  sensitive = false
+  default   = ""
+}
+
+variable "qdrant_api_key" {
+  type      = string
+  sensitive = true
+  default   = ""
 }

@@ -1,19 +1,20 @@
 """
 Vector store management for the AML Policy FAQ Bot.
 
-Uses Chroma + S3 for persistence on Lambda.
+Uses Qdrant Cloud for vector storage.
 """
 
-import os
-from pathlib import Path
-
-import boto3
-from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams
 
 from app.core.config import init_settings
 from app.embeddings.embedder import get_embeddings
+
+# NVIDIA embedding dimension (nv-embedqa-e5-v5 = 1024)
+EMBEDDING_DIMENSION = 1024
 
 
 def get_text_splitter() -> RecursiveCharacterTextSplitter:
@@ -26,72 +27,47 @@ def get_text_splitter() -> RecursiveCharacterTextSplitter:
     )
 
 
-def _get_chroma_path() -> str:
-    """Get Chroma storage path."""
+def _get_qdrant_client() -> QdrantClient:
+    """Get Qdrant client configured for Qdrant Cloud."""
     settings = init_settings()
-    return settings.VECTOR_STORE_PATH
+    
+    if not settings.QDRANT_URL or not settings.QDRANT_API_KEY:
+        raise ValueError("QDRANT_URL and QDRANT_API_KEY are required")
+    
+    return QdrantClient(
+        url=settings.QDRANT_URL,
+        api_key=settings.QDRANT_API_KEY.get_secret_value(),
+        prefer_grpc=True,  # Better performance
+    )
 
 
-def _sync_from_s3():
-    """Download Chroma DB from S3."""
+def _ensure_collection_exists(client: QdrantClient, collection_name: str):
+    """Ensure the collection exists, create if not."""
+    collections = client.get_collections().collections
+    exists = any(c.name == collection_name for c in collections)
+    
+    if not exists:
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(
+                size=EMBEDDING_DIMENSION,
+                distance=Distance.COSINE,
+            ),
+        )
+
+
+def get_vector_store() -> QdrantVectorStore:
+    """Get Qdrant vector store."""
     settings = init_settings()
-    if not settings.S3_BUCKET:
-        return
+    client = _get_qdrant_client()
     
-    local_path = _get_chroma_path()
-    s3 = boto3.client('s3')
+    # Ensure collection exists
+    _ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME)
     
-    try:
-        response = s3.list_objects_v2(Bucket=settings.S3_BUCKET, Prefix="chroma_db/")
-        if 'Contents' not in response:
-            return
-        
-        Path(local_path).mkdir(parents=True, exist_ok=True)
-        
-        for obj in response['Contents']:
-            key = obj['Key']
-            if key.endswith('/'):
-                continue
-            local_file = os.path.join(local_path, key.replace("chroma_db/", ""))
-            Path(local_file).parent.mkdir(parents=True, exist_ok=True)
-            s3.download_file(settings.S3_BUCKET, key, local_file)
-    except Exception as e:
-        print(f"S3 sync error: {e}")
-
-
-def _sync_to_s3():
-    """Upload Chroma DB to S3."""
-    settings = init_settings()
-    if not settings.S3_BUCKET:
-        return
-    
-    local_path = _get_chroma_path()
-    if not os.path.exists(local_path):
-        return
-    
-    s3 = boto3.client('s3')
-    
-    try:
-        for root, _, files in os.walk(local_path):
-            for file in files:
-                local_file = os.path.join(root, file)
-                s3_key = "chroma_db/" + os.path.relpath(local_file, local_path)
-                s3.upload_file(local_file, settings.S3_BUCKET, s3_key)
-    except Exception as e:
-        print(f"S3 upload error: {e}")
-
-
-def get_vector_store() -> Chroma:
-    """Get Chroma vector store."""
-    _sync_from_s3()
-    
-    local_path = _get_chroma_path()
-    Path(local_path).mkdir(parents=True, exist_ok=True)
-    
-    return Chroma(
-        persist_directory=local_path,
-        embedding_function=get_embeddings(),
-        collection_name="aml_policies"
+    return QdrantVectorStore(
+        client=client,
+        collection_name=settings.QDRANT_COLLECTION_NAME,
+        embedding=get_embeddings(),
     )
 
 
@@ -108,7 +84,6 @@ async def add_documents_to_store(documents: list[Document]) -> int:
     metadatas = [c.metadata for c in chunks]
     vector_store.add_texts(texts=texts, metadatas=metadatas)
     
-    _sync_to_s3()
     return len(chunks)
 
 

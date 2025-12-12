@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting AML Policy FAQ Bot...")
     settings = init_settings()
-    logger.info(f"Vector store path: {settings.VECTOR_STORE_PATH}")
+    logger.info(f"Using Qdrant at: {settings.QDRANT_URL}")
     
     yield
     

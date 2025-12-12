@@ -35,6 +35,8 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_MODEL_NAME: ${{ secrets.NVIDIA_MODEL_NAME }}
           NVIDIA_EMBEDDING_MODEL_NAME: ${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
         run: |
           uv run python -c "from app.main import app; print('FastAPI app OK')"
           uv run python -c "from handler import handler; print('Lambda handler OK')"

@@ -52,7 +52,6 @@ resource "aws_lambda_function" "api" {
     variables = {
       CONFIG_SECRET_NAME = aws_secretsmanager_secret.app_config.name
       S3_BUCKET          = aws_s3_bucket.documents.id
-      VECTOR_STORE_PATH  = "/tmp/chroma_db"
       ENVIRONMENT        = var.environment
     }
   }

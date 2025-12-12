@@ -51,7 +51,9 @@ jobs:
           terraform plan \
             -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
             -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
-            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}"
+            -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
+            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
 
       # ========================
       # APPLY
@@ -63,6 +65,8 @@ jobs:
             -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
             -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
             -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
+            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}" \
             -out=tfplan
 
       - name: Terraform Apply
@@ -95,6 +99,8 @@ jobs:
             -var="nvidia_api_key=${{ secrets.NVIDIA_API_KEY }}" \
             -var="nvidia_model_name=${{ secrets.NVIDIA_MODEL_NAME }}" \
             -var="nvidia_embedding_model_name=${{ secrets.NVIDIA_EMBEDDING_MODEL_NAME }}" \
+            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}" \
             -out=tfplan-destroy
 
       - name: Terraform Destroy
