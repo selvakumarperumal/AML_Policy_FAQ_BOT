@@ -2,6 +2,7 @@
 LangGraph-based RAG Agent for AML Policy FAQ Bot.
 """
 
+import re
 from typing import AsyncGenerator
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
@@ -30,6 +31,15 @@ def get_llm() -> ChatNVIDIA:
         temperature=settings.LLM_TEMPERATURE,
         max_tokens=settings.LLM_MAX_TOKENS,
     )
+
+
+def clean_response(text: str) -> str:
+    """Remove <think>...</think> tags and clean the response."""
+    # Remove think blocks (LLM reasoning that shouldn't be shown)
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Remove any remaining empty lines at start
+    text = text.strip()
+    return text
 
 
 SYSTEM_PROMPT = """You are an AML compliance assistant. Answer based ONLY on the context.
@@ -62,7 +72,7 @@ class RAGAgent:
         self.graph = graph.compile()
     
     async def _retrieve(self, state: RAGState) -> dict:
-        retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})  # Reduced from 6
+        retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
         docs = await retriever.ainvoke(state["question"])
         
         context_parts = []
@@ -98,6 +108,8 @@ class RAGAgent:
         })
         
         answer = next((m.content for m in reversed(result["messages"]) if isinstance(m, AIMessage)), "")
+        # Clean the response to remove <think> tags
+        answer = clean_response(answer)
         return {"answer": answer, "sources": result["sources"], "escalate": result["escalate"]}
     
     async def stream_query(self, question: str, **kwargs) -> AsyncGenerator[StreamChunk, None]:
@@ -111,10 +123,15 @@ class RAGAgent:
             yield StreamChunk(type="done", content="")
             return
         
-        # Stream only AI message tokens (filter out human messages, tool calls, etc.)
+        # Collect full response first, then clean and yield
+        full_response = ""
         async for chunk, metadata in self.graph.astream(initial_state, stream_mode="messages"):
-            # Only yield actual AI content, not human messages or empty chunks
             if isinstance(chunk, AIMessage) and hasattr(chunk, 'content') and chunk.content:
-                yield StreamChunk(type="token", content=chunk.content)
+                full_response += chunk.content
+        
+        # Clean the response (remove <think> tags)
+        cleaned = clean_response(full_response)
+        if cleaned:
+            yield StreamChunk(type="token", content=cleaned)
         
         yield StreamChunk(type="done", content="")
