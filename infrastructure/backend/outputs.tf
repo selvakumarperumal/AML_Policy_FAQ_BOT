@@ -16,6 +16,6 @@ output "api_gateway_url" {
 }
 
 output "s3_bucket_name" {
-  description = "S3 bucket for document and Chroma storage"
+  description = "S3 bucket for document storage and deployments"
   value       = aws_s3_bucket.documents.id
 }

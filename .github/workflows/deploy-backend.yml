@@ -8,6 +8,7 @@ env:
   PYTHON_VERSION: '3.12'
   PROJECT_NAME: aml-faq-bot
   ENVIRONMENT: dev
+  TF_VERSION: 1.9.0
 
 jobs:
   test:
@@ -95,6 +96,9 @@ jobs:
     needs: build
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -108,28 +112,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get Lambda function name
-        id: get-lambda
-        run: |
-          LAMBDA_NAME="${{ env.PROJECT_NAME }}-api-${{ env.ENVIRONMENT }}"
-          echo "function_name=${LAMBDA_NAME}" >> $GITHUB_OUTPUT
-          echo "Lambda function: ${LAMBDA_NAME}"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Get S3 bucket name
-        id: get-bucket
+      - name: Get Infrastructure Outputs
+        id: infra
+        working-directory: infrastructure/backend
         run: |
-          # Query S3 bucket by naming pattern
-          S3_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${{ env.PROJECT_NAME }}-data-${{ env.ENVIRONMENT }}')].Name" --output text)
-          echo "bucket_name=${S3_BUCKET}" >> $GITHUB_OUTPUT
-          echo "S3 Bucket: ${S3_BUCKET}"
+          terraform init -backend-config=backend.hcl
+          echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+          echo "lambda_name=$(terraform output -raw lambda_function_name)" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
 
       - name: Deploy to Lambda
         run: |
           PACKAGE_SIZE=$(stat -c%s dist/lambda.zip)
           MAX_DIRECT_SIZE=52428800  # 50MB in bytes
           
-          LAMBDA_NAME="${{ steps.get-lambda.outputs.function_name }}"
-          S3_BUCKET="${{ steps.get-bucket.outputs.bucket_name }}"
+          LAMBDA_NAME="${{ steps.infra.outputs.lambda_name }}"
+          S3_BUCKET="${{ steps.infra.outputs.s3_bucket }}"
           
           if [ "$PACKAGE_SIZE" -gt "$MAX_DIRECT_SIZE" ]; then
             echo "Package size ($PACKAGE_SIZE bytes) exceeds 50MB, using S3 upload..."
@@ -152,24 +155,15 @@ jobs:
       - name: Wait for update
         run: |
           aws lambda wait function-updated \
-            --function-name ${{ steps.get-lambda.outputs.function_name }}
+            --function-name ${{ steps.infra.outputs.lambda_name }}
 
-      - name: Get Lambda URL and health check
+      - name: Deployment Summary
         run: |
-          LAMBDA_NAME="${{ steps.get-lambda.outputs.function_name }}"
-          
-          # Get Lambda Function URL
-          URL=$(aws lambda get-function-url-config \
-            --function-name ${LAMBDA_NAME} \
-            --query 'FunctionUrl' --output text 2>/dev/null || echo "")
-          
-          if [ -n "$URL" ]; then
-            echo "Lambda URL: $URL"
-            
-            # Health check
-            curl -sf "${URL}health" || echo "Health check endpoint not available yet"
-          fi
-          
-          echo "## ✅ Lambda Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Function**: ${LAMBDA_NAME}" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL**: ${URL:-Not configured}" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### API Gateway URL (use for frontend)" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.infra.outputs.api_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- Lambda: ${{ steps.infra.outputs.lambda_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: ${{ steps.infra.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY

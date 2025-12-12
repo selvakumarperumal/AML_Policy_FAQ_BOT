@@ -79,15 +79,17 @@ jobs:
         run: |
           echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
           echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
-          echo "lambda_url=$(terraform output -raw lambda_function_url)" >> $GITHUB_OUTPUT
       
       - name: Apply Summary
         if: inputs.action == 'apply'
         run: |
           echo "## ✅ Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- **API Gateway**: ${{ steps.outputs.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Lambda URL**: ${{ steps.outputs.outputs.lambda_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Bucket**: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### API Gateway (use this for frontend)" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.outputs.outputs.api_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 Bucket: ${{ steps.outputs.outputs.s3_bucket }}" >> $GITHUB_STEP_SUMMARY
 
       # ========================
       # DESTROY
