@@ -6,6 +6,8 @@ on:
 env:
   AWS_REGION: ap-south-1
   PYTHON_VERSION: '3.12'
+  PROJECT_NAME: aml-faq-bot
+  ENVIRONMENT: dev
 
 jobs:
   test:
@@ -60,10 +62,19 @@ jobs:
           cp -r app ../lambda_package/
           cp handler.py ../lambda_package/
           
-          # Create zip
+          # Create zip (exclude unnecessary files to reduce size)
           cd ../lambda_package
           mkdir -p ../dist
-          zip -r ../dist/lambda.zip . -x "*.pyc" -x "*__pycache__*" -x "*.dist-info/*"
+          zip -rq ../dist/lambda.zip . \
+            -x "*.pyc" \
+            -x "*__pycache__*" \
+            -x "*.dist-info/*" \
+            -x "*.egg-info/*" \
+            -x "tests/*" \
+            -x "docs/*"
+          
+          # Show package size
+          ls -lh ../dist/lambda.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -91,18 +102,68 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Get Lambda function name
+        id: get-lambda
+        run: |
+          LAMBDA_NAME="${{ env.PROJECT_NAME }}-api-${{ env.ENVIRONMENT }}"
+          echo "function_name=${LAMBDA_NAME}" >> $GITHUB_OUTPUT
+          echo "Lambda function: ${LAMBDA_NAME}"
+
+      - name: Get S3 bucket name
+        id: get-bucket
+        run: |
+          # Query S3 bucket by naming pattern
+          S3_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${{ env.PROJECT_NAME }}-data-${{ env.ENVIRONMENT }}')].Name" --output text)
+          echo "bucket_name=${S3_BUCKET}" >> $GITHUB_OUTPUT
+          echo "S3 Bucket: ${S3_BUCKET}"
+
       - name: Deploy to Lambda
         run: |
-          aws lambda update-function-code \
-            --function-name aml-faq-bot-api-dev \
-            --zip-file fileb://dist/lambda.zip
+          PACKAGE_SIZE=$(stat -c%s dist/lambda.zip)
+          MAX_DIRECT_SIZE=52428800  # 50MB in bytes
+          
+          LAMBDA_NAME="${{ steps.get-lambda.outputs.function_name }}"
+          S3_BUCKET="${{ steps.get-bucket.outputs.bucket_name }}"
+          
+          if [ "$PACKAGE_SIZE" -gt "$MAX_DIRECT_SIZE" ]; then
+            echo "Package size ($PACKAGE_SIZE bytes) exceeds 50MB, using S3 upload..."
+            
+            # Upload to S3
+            aws s3 cp dist/lambda.zip s3://${S3_BUCKET}/deployments/lambda.zip
+            
+            # Deploy from S3
+            aws lambda update-function-code \
+              --function-name ${LAMBDA_NAME} \
+              --s3-bucket ${S3_BUCKET} \
+              --s3-key deployments/lambda.zip
+          else
+            echo "Package size ($PACKAGE_SIZE bytes), using direct upload..."
+            aws lambda update-function-code \
+              --function-name ${LAMBDA_NAME} \
+              --zip-file fileb://dist/lambda.zip
+          fi
 
       - name: Wait for update
         run: |
           aws lambda wait function-updated \
-            --function-name aml-faq-bot-api-dev
+            --function-name ${{ steps.get-lambda.outputs.function_name }}
 
-      - name: Summary
+      - name: Get Lambda URL and health check
         run: |
-          echo "## Lambda Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "Function: aml-faq-bot-api-dev" >> $GITHUB_STEP_SUMMARY
+          LAMBDA_NAME="${{ steps.get-lambda.outputs.function_name }}"
+          
+          # Get Lambda Function URL
+          URL=$(aws lambda get-function-url-config \
+            --function-name ${LAMBDA_NAME} \
+            --query 'FunctionUrl' --output text 2>/dev/null || echo "")
+          
+          if [ -n "$URL" ]; then
+            echo "Lambda URL: $URL"
+            
+            # Health check
+            curl -sf "${URL}health" || echo "Health check endpoint not available yet"
+          fi
+          
+          echo "## ✅ Lambda Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Function**: ${LAMBDA_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: ${URL:-Not configured}" >> $GITHUB_STEP_SUMMARY

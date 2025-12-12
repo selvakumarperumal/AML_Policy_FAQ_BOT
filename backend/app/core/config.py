@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import SecretStr
 from functools import lru_cache
 from typing import Optional
+from
 
 
 class Settings(BaseSettings):

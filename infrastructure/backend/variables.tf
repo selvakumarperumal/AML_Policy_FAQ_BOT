@@ -20,10 +20,11 @@ variable "lambda_timeout" {
   default = 30
 }
 
-# Secrets (from GitHub Actions)
+# Secrets (from GitHub Actions or terraform.tfvars)
 variable "nvidia_api_key" {
   type      = string
   sensitive = true
+  default   = "" # Placeholder - real value via TF_VAR_nvidia_api_key or terraform.tfvars
 }
 
 variable "nvidia_model_name" {
