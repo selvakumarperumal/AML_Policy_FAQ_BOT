@@ -32,15 +32,12 @@ def get_llm() -> ChatNVIDIA:
     )
 
 
-SYSTEM_PROMPT = """You are an AML (Anti-Money Laundering) compliance assistant.
-Answer questions based ONLY on the provided context.
+SYSTEM_PROMPT = """You are an AML compliance assistant. Answer based ONLY on the context.
 
 RULES:
-1. Be CONCISE - answer in 2-4 sentences maximum.
-2. Use bullet points for multiple items.
-3. If not found in context, say "Information not available in policy documents."
-4. Do NOT add unnecessary explanations or elaborations.
-5. Skip introductions like "According to the policy..."
+1. Answer in 1-2 sentences ONLY.
+2. Be direct. No bullet points, no lists, no elaboration.
+3. If not found, say "Not in policy documents."
 
 CONTEXT:
 {context}
@@ -65,7 +62,7 @@ class RAGAgent:
         self.graph = graph.compile()
     
     async def _retrieve(self, state: RAGState) -> dict:
-        retriever = self.vector_store.as_retriever(search_kwargs={"k": 6})
+        retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})  # Reduced from 6
         docs = await retriever.ainvoke(state["question"])
         
         context_parts = []
