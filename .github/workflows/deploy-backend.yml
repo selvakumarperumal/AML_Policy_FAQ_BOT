@@ -69,16 +69,16 @@ jobs:
           cp -r app ../lambda_package/
           cp handler.py ../lambda_package/
           
-          # Create zip (exclude unnecessary files to reduce size)
+          # Create zip (keep .dist-info for package metadata!)
           cd ../lambda_package
           mkdir -p ../dist
           zip -rq ../dist/lambda.zip . \
             -x "*.pyc" \
             -x "*__pycache__*" \
-            -x "*.dist-info/*" \
-            -x "*.egg-info/*" \
             -x "tests/*" \
-            -x "docs/*"
+            -x "docs/*" \
+            -x "*.md" \
+            -x "LICENSE*"
           
           # Show package size
           ls -lh ../dist/lambda.zip
