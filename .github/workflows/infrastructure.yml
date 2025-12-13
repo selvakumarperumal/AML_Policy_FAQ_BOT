@@ -94,6 +94,17 @@ jobs:
       # ========================
       # DESTROY
       # ========================
+      - name: Empty S3 Bucket
+        if: inputs.action == 'destroy'
+        run: |
+          BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+          if [ -n "$BUCKET_NAME" ]; then
+            echo "Emptying S3 bucket: $BUCKET_NAME"
+            aws s3 rm s3://$BUCKET_NAME --recursive || echo "Bucket may already be empty or not exist"
+          else
+            echo "No S3 bucket found in Terraform state"
+          fi
+
       - name: Terraform Destroy Plan
         if: inputs.action == 'destroy'
         run: |
